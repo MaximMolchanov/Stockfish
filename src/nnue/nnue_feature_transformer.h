@@ -245,7 +245,7 @@ namespace Eval::NNUE {
         st = st->previous;
       }
 
-      if (ksq_ok && st->accumulator.state[c] == COMPUTED)
+      if (ksq_ok && st->dirtyPiece.piece[0] != make_piece(c, KING) && st->accumulator.state[c] == COMPUTED)
       {
         if (next == nullptr)
           return;
@@ -263,12 +263,6 @@ namespace Eval::NNUE {
         for (StateInfo *st2 = pos.state(); st2 != next; st2 = st2->previous)
           Features::HalfKP<Features::Side::kFriend>::AppendChangedIndices(pos,
               st2->dirtyPiece, c, &removed[1], &added[1]);
-        for (auto& i : removed[1])
-          for (auto& j : added[1])
-            if (i == j) {
-              i = j = 0;
-              continue;
-            }
 
         // Mark the accumulators as computed.
         next->accumulator.state[c] = COMPUTED;
@@ -291,7 +285,6 @@ namespace Eval::NNUE {
             // Difference calculation for the deactivated features
             for (const auto index : removed[i])
             {
-              if (index == 0) continue;
               const IndexType offset = kHalfDimensions * index + j * kTileHeight;
               auto column = reinterpret_cast<const vec_t*>(&weights_[offset]);
               for (IndexType k = 0; k < kNumRegs; ++k)
@@ -301,7 +294,6 @@ namespace Eval::NNUE {
             // Difference calculation for the activated features
             for (const auto index : added[i])
             {
-              if (index == 0) continue;
               const IndexType offset = kHalfDimensions * index + j * kTileHeight;
               auto column = reinterpret_cast<const vec_t*>(&weights_[offset]);
               for (IndexType k = 0; k < kNumRegs; ++k)
@@ -327,7 +319,6 @@ namespace Eval::NNUE {
           // Difference calculation for the deactivated features
           for (const auto index : removed[i])
           {
-            if (index == 0) continue;
             const IndexType offset = kHalfDimensions * index;
 
             for (IndexType j = 0; j < kHalfDimensions; ++j)
@@ -337,7 +328,6 @@ namespace Eval::NNUE {
           // Difference calculation for the activated features
           for (const auto index : added[i])
           {
-            if (index == 0) continue;
             const IndexType offset = kHalfDimensions * index;
 
             for (IndexType j = 0; j < kHalfDimensions; ++j)

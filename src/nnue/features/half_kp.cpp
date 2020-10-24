@@ -28,6 +28,17 @@ namespace Eval::NNUE::Features {
     return Square(int(s) ^ (bool(perspective) * 63));
   }
 
+  // Removes index from indices if such exists
+  bool removeIfExists(IndexList* indices, IndexType index) {
+    for (std::size_t i = 0; i < indices->size(); ++i)
+      if ((*indices)[i] == index) {
+        std::swap((*indices)[i], (*indices)[indices->size() - 1]);
+        indices->resize(indices->size() - 1);
+        return true;
+      }
+    return false;
+  }
+
   // Find the index of the feature quantity from the king position and PieceSquare
   template <Side AssociatedKing>
   inline IndexType HalfKP<AssociatedKing>::MakeIndex(
@@ -59,10 +70,16 @@ namespace Eval::NNUE::Features {
     for (int i = 0; i < dp.dirty_num; ++i) {
       Piece pc = dp.piece[i];
       if (type_of(pc) == KING) continue;
-      if (dp.from[i] != SQ_NONE)
-        removed->push_back(MakeIndex(perspective, dp.from[i], pc, ksq));
-      if (dp.to[i] != SQ_NONE)
-        added->push_back(MakeIndex(perspective, dp.to[i], pc, ksq));
+      if (dp.from[i] != SQ_NONE) {
+        IndexType index = MakeIndex(perspective, dp.from[i], pc, ksq);
+        if (!removeIfExists(added, index))
+          removed->push_back(index);
+      }
+      if (dp.to[i] != SQ_NONE) {
+        IndexType index = MakeIndex(perspective, dp.to[i], pc, ksq);
+        if (!removeIfExists(removed, index))
+          added->push_back(index);
+      }
     }
   }
 
