@@ -230,7 +230,7 @@ namespace Eval::NNUE {
       // Look for a usable accumulator of an earlier position. We keep track
       // of the estimated gain in terms of features to be added/subtracted.
       StateInfo *st = pos.state(), *next = nullptr;
-      int gain = popcount(pos.pieces()) - 2;
+      bool ksq_ok = true;
       while (st->accumulator.state[c] == EMPTY)
       {
         auto& dp = st->dirtyPiece;
@@ -239,14 +239,13 @@ namespace Eval::NNUE {
         static_assert(std::is_same_v<RawFeatures::SortedTriggerSet,
               Features::CompileTimeList<Features::TriggerEvent, Features::TriggerEvent::kFriendKingMoved>>,
               "Current code assumes that only kFriendlyKingMoved refresh trigger is being used.");
-        if (   dp.piece[0] == make_piece(c, KING)
-            || (gain -= dp.dirty_num + 1) < 0)
-          break;
+        if (dp.piece[0] == make_piece(c, KING))
+          ksq_ok = dp.from[0] == pos.square<KING>(c);
         next = st;
         st = st->previous;
       }
 
-      if (st->accumulator.state[c] == COMPUTED)
+      if (ksq_ok && st->accumulator.state[c] == COMPUTED)
       {
         if (next == nullptr)
           return;
