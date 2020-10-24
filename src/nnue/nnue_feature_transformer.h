@@ -230,7 +230,6 @@ namespace Eval::NNUE {
       // Look for a usable accumulator of an earlier position. We keep track
       // of the estimated gain in terms of features to be added/subtracted.
       StateInfo *st = pos.state(), *next = nullptr;
-      bool ksq_ok = true;
       while (st->accumulator.state[c] == EMPTY)
       {
         auto& dp = st->dirtyPiece;
@@ -240,12 +239,12 @@ namespace Eval::NNUE {
               Features::CompileTimeList<Features::TriggerEvent, Features::TriggerEvent::kFriendKingMoved>>,
               "Current code assumes that only kFriendlyKingMoved refresh trigger is being used.");
         if (dp.piece[0] == make_piece(c, KING))
-          ksq_ok = dp.from[0] == pos.square<KING>(c);
+          break;
         next = st;
         st = st->previous;
       }
 
-      if (ksq_ok && st->dirtyPiece.piece[0] != make_piece(c, KING) && st->accumulator.state[c] == COMPUTED)
+      if (st->accumulator.state[c] == COMPUTED)
       {
         if (next == nullptr)
           return;
