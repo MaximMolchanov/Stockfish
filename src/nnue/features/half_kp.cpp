@@ -23,6 +23,18 @@
 
 namespace Eval::NNUE::Features {
 
+    // Removes index from indices if such exists
+    inline bool removeIfFound(IndexList* indices, int n, IndexType index) {
+    for (int i = n - 1; i >= 0; --i) {
+      if ((*indices)[i] == index) {
+        (*indices)[i] = *(indices->end() - 1);
+        indices->pop_back();
+        return true;
+      }
+    }
+    return false;
+  }
+
   // Orient a square according to perspective (rotates by 180 for black)
   inline Square orient(Color perspective, Square s) {
     return Square(int(s) ^ (bool(perspective) * 63));
@@ -56,13 +68,16 @@ namespace Eval::NNUE::Features {
       IndexList* removed, IndexList* added) {
 
     Square ksq = orient(perspective, pos.square<KING>(perspective));
+    int removed_size = static_cast<int>(removed->size());
     for (int i = 0; i < dp.dirty_num; ++i) {
       Piece pc = dp.piece[i];
       if (type_of(pc) == KING) continue;
       if (dp.from[i] != SQ_NONE)
         removed->push_back(MakeIndex(perspective, dp.from[i], pc, ksq));
       if (dp.to[i] != SQ_NONE)
-        added->push_back(MakeIndex(perspective, dp.to[i], pc, ksq));
+        if (IndexType index = MakeIndex(perspective, dp.to[i], pc, ksq);
+          !removeIfFound(removed, removed_size, index))
+        added->push_back(index);
     }
   }
 

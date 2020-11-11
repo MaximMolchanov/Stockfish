@@ -34,6 +34,7 @@ namespace Eval::NNUE::Features {
     std::size_t size() const { return size_; }
     void resize(std::size_t size) { size_ = size; }
     void push_back(const T& value) { values_[size_++] = value; }
+    void pop_back() { --size_; }
     T& operator[](std::size_t index) { return values_[index]; }
     T* begin() { return values_; }
     T* end() { return values_ + size_; }
