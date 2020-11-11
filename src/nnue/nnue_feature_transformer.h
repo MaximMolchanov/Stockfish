@@ -278,9 +278,16 @@ namespace Eval::NNUE {
         Features::IndexList removed[2], added[2];
         Features::HalfKP<Features::Side::kFriend>::AppendChangedIndices(pos,
             next->dirtyPiece, c, &removed[0], &added[0]);
-        for (StateInfo *st2 = pos.state(); st2 != next; st2 = st2->previous)
-          Features::HalfKP<Features::Side::kFriend>::AppendChangedIndices(pos,
-              st2->dirtyPiece, c, &removed[1], &added[1]);
+        if (next == pos.state()->previous) {
+            for (StateInfo *st2 = pos.state(); st2 != next; st2 = st2->previous)
+            Features::HalfKP<Features::Side::kFriend>::AppendChangedIndices(pos,
+                st2->dirtyPiece, c, &removed[1], &added[1]);
+        } else {
+            Bitboard used = 0;
+            for (StateInfo *st2 = pos.state(); st2 != next; st2 = st2->previous)
+            Features::HalfKP<Features::Side::kFriend>::AppendChangedIndices(pos,
+                st2->dirtyPiece, c, &removed[1], &added[1], &used);
+        }
 
         // Mark the accumulators as computed.
         next->accumulator.state[c] = COMPUTED;
