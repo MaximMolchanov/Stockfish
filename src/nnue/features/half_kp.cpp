@@ -25,7 +25,15 @@ namespace Eval::NNUE::Features {
 
   // Removes index from indices if such exists
   inline bool removeIfExists(IndexList* indices, int n, IndexType index) {
+#ifdef USE_SSE2
+    int r = _mm_movemask_epi8(_mm_cmpeq_epi16(
+      *reinterpret_cast<__m128i*>(indices->begin()), _mm_set1_epi16(index)));
+    if (r == 0)
+      return false;
+    if (int i = lsb(r) >> 1; i < n) {
+#else
     for (int i = n - 1; i >= 0; --i) {
+#endif
       if ((*indices)[i] == index) {
         (*indices)[i] = *(indices->end() - 1);
         indices->pop_back();
@@ -65,21 +73,17 @@ namespace Eval::NNUE::Features {
   template <Side AssociatedKing>
   void HalfKP<AssociatedKing>::AppendChangedIndices(
       const Position& pos, const DirtyPiece& dp, Color perspective,
-      IndexList* removed, IndexList* added, Bitboard* used) {
+      IndexList* removed, IndexList* added) {
 
     Square ksq = orient(perspective, pos.square<KING>(perspective));
     int removed_size = static_cast<int>(removed->size());
     for (int i = 0; i < dp.dirty_num; ++i) {
       Piece pc = dp.piece[i];
       if (type_of(pc) == KING) continue;
-      if (dp.from[i] != SQ_NONE) {
+      if (dp.from[i] != SQ_NONE)
         removed->push_back(MakeIndex(perspective, dp.from[i], pc, ksq));
-        if (used != nullptr)
-          *used |= dp.from[i];
-      }
       if (dp.to[i] != SQ_NONE)
         if (IndexType index = MakeIndex(perspective, dp.to[i], pc, ksq);
-          used == nullptr || !(*used & dp.to[i]) ||
           !removeIfExists(removed, removed_size, index))
         added->push_back(index);
     }

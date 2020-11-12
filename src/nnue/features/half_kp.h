@@ -51,8 +51,7 @@ namespace Eval::NNUE::Features {
 
     // Get a list of indices for recently changed features
     static void AppendChangedIndices(const Position& pos, const DirtyPiece& dp, Color perspective,
-                                     IndexList* removed, IndexList* added,
-                                     Bitboard* used = nullptr);
+                                     IndexList* removed, IndexList* added);
 
    private:
     // Index of a feature for a given king position and another piece on some square
