@@ -51,13 +51,13 @@ namespace Eval::NNUE::Features {
     }
 
    private:
-    T values_[MaxSize];
+    alignas(kCacheLineSize) T values_[MaxSize];
     std::size_t size_ = 0;
   };
 
   //Type of feature index list
   class IndexList
-      : public ValueList<IndexType, RawFeatures::kMaxActiveDimensions> {
+      : public ValueList<std::uint16_t, RawFeatures::kMaxActiveDimensions> {
   };
 
 }  // namespace Eval::NNUE::Features

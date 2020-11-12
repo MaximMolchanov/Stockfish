@@ -30,16 +30,16 @@ namespace Eval::NNUE::Features {
       *reinterpret_cast<__m128i*>(indices->begin()), _mm_set1_epi16(index)));
     if (r == 0)
       return false;
-    if (int i = lsb(r) >> 1; i < n) {
+    if (int i = lsb(r) >> 1; i < n)
 #else
-    for (int i = n - 1; i >= 0; --i) {
+    for (int i = n - 1; i >= 0; --i)
+      if ((*indices)[i] == index)
 #endif
-      if ((*indices)[i] == index) {
+      {
         (*indices)[i] = *(indices->end() - 1);
         indices->pop_back();
         return true;
       }
-    }
     return false;
   }
 
