@@ -110,23 +110,18 @@ void Position::init() {
 
   PRNG rng(1070372);
 
-  bool hashUsed[8192];
-  std::memset(hashUsed, 0, sizeof(hashUsed));
   for (Piece pc : Pieces)
-      for (Square s = SQ_A1; s <= SQ_H8; ++s) {
+      for (Square s = SQ_A1; s <= SQ_H8; ++s)
           Zobrist::psq[pc][s] = rng.rand<Key>();
-          if (type_of(pc) == PAWN)
-              hashUsed[H1(Zobrist::psq[pc][s])] = true;
-      }
 
   for (File f = FILE_A; f <= FILE_H; ++f)
-      hashUsed[H1(Zobrist::enpassant[f] = rng.rand<Key>())] = true;
+      Zobrist::enpassant[f] = rng.rand<Key>();
 
   for (int cr = NO_CASTLING; cr <= ANY_CASTLING; ++cr)
-      hashUsed[H1(Zobrist::castling[cr] = rng.rand<Key>())] = true;
+      Zobrist::castling[cr] = rng.rand<Key>();
 
-  hashUsed[H1(Zobrist::side = rng.rand<Key>())] = true;
-  hashUsed[H1(Zobrist::noPawns = rng.rand<Key>())] = true;
+  Zobrist::side = rng.rand<Key>();
+  Zobrist::noPawns = rng.rand<Key>();
 
   std::memset(cuckoo, 0, sizeof(cuckoo));
   std::memset(cuckooMove, 0, sizeof(cuckooMove));
@@ -139,17 +134,15 @@ void Position::init() {
                     Square s2 = pop_lsb(&bb);
                     if (s < s2) break;
                     Key key = Zobrist::psq[pc][s] ^ Zobrist::psq[pc][s2] ^ Zobrist::side;
-                    if (update) {
-                        cuckoo[H1(key)] = key;
-                        cuckooMove[H1(key)] = make_move(s2, s);
-                    } else if (cuckoo[H1(key)] != 0)
+                    if (int h = H1(key); update) {
+                        cuckoo[h] = key;
+                        cuckooMove[h] = make_move(s2, s);
+                    } else if (cuckoo[h] != 0)
                         return false;
                 }
                 return true;
               };
-              while (hashUsed[H1(Zobrist::psq[pc][s])] || !check(false))
-                  Zobrist::psq[pc][s] = (Zobrist::psq[pc][s] & ~0x1fff) | H1(rng.rand<Key>());
-              hashUsed[H1(Zobrist::psq[pc][s])] = true;
+              while (!check(false)) Zobrist::psq[pc][s] = rng.rand<Key>();
               check(true);
           }
   assert(std::count_if(cuckoo, cuckoo + 8192, [](Key k) { return k > 0; }) == 3668);
