@@ -96,12 +96,12 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 // situations. Description of the algorithm in the following paper:
 // https://marcelk.net/2013-04-06/paper/upcoming-rep-v2.pdf
 
-// First and second hash functions for indexing the cuckoo tables
+// Hash function for indexing the hash tables
 inline int H1(Key h) { return h & 0x1fff; }
 
-// Cuckoo tables with Zobrist hashes of valid reversible moves, and the moves themselves
-Key cuckoo[8192];
-Move cuckooMove[8192];
+// Hash tables with Zobrist hashes of valid reversible moves, and the moves themselves
+Key hashKeys[8192];
+Move hashMoves[8192];
 
 
 /// Position::init() initializes at startup the various arrays used to compute hash keys
@@ -123,8 +123,8 @@ void Position::init() {
   Zobrist::side = rng.rand<Key>();
   Zobrist::noPawns = rng.rand<Key>();
 
-  std::memset(cuckoo, 0, sizeof(cuckoo));
-  std::memset(cuckooMove, 0, sizeof(cuckooMove));
+  std::memset(hashKeys, 0, sizeof(hashKeys));
+  std::memset(hashMoves, 0, sizeof(hashMoves));
   for (PieceType pt : {QUEEN, ROOK, BISHOP, KING, KNIGHT})
       for (Color c : {WHITE, BLACK})
           for (Square s = SQ_A1; s <= SQ_H8; ++s) {
@@ -135,9 +135,9 @@ void Position::init() {
                     if (s < s2) break;
                     Key key = Zobrist::psq[pc][s] ^ Zobrist::psq[pc][s2] ^ Zobrist::side;
                     if (int h = H1(key); update) {
-                        cuckoo[h] = key;
-                        cuckooMove[h] = make_move(s2, s);
-                    } else if (cuckoo[h] != 0)
+                        hashKeys[h] = key;
+                        hashMoves[h] = make_move(s2, s);
+                    } else if (hashKeys[h] != 0)
                         return false;
                 }
                 return true;
@@ -145,7 +145,7 @@ void Position::init() {
               while (!check(false)) Zobrist::psq[pc][s] = rng.rand<Key>();
               check(true);
           }
-  assert(std::count_if(cuckoo, cuckoo + 8192, [](Key k) { return k > 0; }) == 3668);
+  assert(std::count_if(hashKeys, hashKeys + 8192, [](Key k) { return k > 0; }) == 3668);
 }
 
 
@@ -1213,9 +1213,9 @@ bool Position::has_game_cycle(int ply) const {
       stp = stp->previous->previous;
 
       Key moveKey = originalKey ^ stp->key;
-      if (int j = H1(moveKey); cuckoo[j] == moveKey)
+      if (int j = H1(moveKey); hashKeys[j] == moveKey)
       {
-          Move move = cuckooMove[j];
+          Move move = hashMoves[j];
           Square s1 = from_sq(move);
           Square s2 = to_sq(move);
 
@@ -1226,7 +1226,7 @@ bool Position::has_game_cycle(int ply) const {
 
               // For nodes before or at the root, check that the move is a
               // repetition rather than a move to the current position.
-              // In the cuckoo table, both moves Rc1c5 and Rc5c1 are stored in
+              // In the hash table, both moves Rc1c5 and Rc5c1 are stored in
               // the same location, so we have to select which square to check.
               if (color_of(piece_on(empty(s1) ? s2 : s1)) != side_to_move())
                   continue;
