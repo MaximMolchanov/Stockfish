@@ -97,7 +97,7 @@ std::ostream& operator<<(std::ostream& os, const Position& pos) {
 // https://marcelk.net/2013-04-06/paper/upcoming-rep-v2.pdf
 
 // Hash function for indexing the hash tables
-inline int H1(Key h) { return h & 0x1fff; }
+inline int H1(Key h) { return (h >> 16) & 0x1fff; }
 
 // Hash tables with Zobrist hashes of valid reversible moves, and the moves themselves
 Key hashKeys[8192];
@@ -130,19 +130,19 @@ void Position::init() {
           for (Square s = SQ_A1; s <= SQ_H8; ++s) {
               Piece pc = make_piece(c, pt);
               auto check = [&](bool update) -> bool {
-                for (Bitboard bb = PseudoAttacks[pt][s]; bb;) {
-                    Square s2 = pop_lsb(&bb);
-                    if (s < s2) break;
-                    Key key = Zobrist::psq[pc][s] ^ Zobrist::psq[pc][s2] ^ Zobrist::side;
-                    if (int h = H1(key); update) {
-                        hashKeys[h] = key;
-                        hashMoves[h] = make_move(s2, s);
-                    } else if (hashKeys[h] != 0)
-                        return false;
-                }
-                return true;
+                  for (Bitboard bb = PseudoAttacks[pt][s]; bb;) {
+                      Square s2 = pop_lsb(&bb);
+                      if (s < s2) break;
+                      Key key = Zobrist::psq[pc][s] ^ Zobrist::psq[pc][s2] ^ Zobrist::side;
+                      if (int h = H1(key); update) {
+                          hashKeys[h] = key;
+                          hashMoves[h] = make_move(s2, s);
+                      } else if (hashKeys[h] != 0)
+                          return false;
+                  }
+                  return true;
               };
-              while (!check(false)) Zobrist::psq[pc][s] = rng.rand<Key>();
+              while (!check(false)) Zobrist::psq[pc][s] ^= rng.rand<Key>() & 0x1fff0000;
               check(true);
           }
   assert(std::count_if(hashKeys, hashKeys + 8192, [](Key k) { return k > 0; }) == 3668);
