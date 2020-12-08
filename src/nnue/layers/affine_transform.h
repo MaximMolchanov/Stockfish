@@ -534,6 +534,7 @@ namespace Eval::NNUE::Layers {
           for (IndexType j = kStart; j < kNumChunks; ++j)
           {
             const __m256i in = input_vector[j];
+            if (_mm256_testz_si256(in, in)) continue;
 
 #if defined (USE_VNNI)
             m256_add_dpbusd_epi32(sum0, in, row0[j]);
@@ -617,6 +618,9 @@ namespace Eval::NNUE::Layers {
           for (int j = 1; j < (int)kNumChunks; ++j)
           {
             const __m128i in = input_vector[j];
+#if defined (USE_SSE41)
+            if (_mm_testz_si128(in, in)) continue;
+#endif
 
             sum0 = _mm_add_epi32(sum0, m128_dpbusd_epi32(in, row0[j]));
             sum1 = _mm_add_epi32(sum1, m128_dpbusd_epi32(in, row1[j]));
