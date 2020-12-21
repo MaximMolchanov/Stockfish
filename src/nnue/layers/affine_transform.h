@@ -245,8 +245,8 @@ namespace Eval::NNUE::Layers {
 #if defined (USE_VNNI)
         acc = _mm512_dpbusd_epi32(acc, a0, b0);
         acc = _mm512_dpbusd_epi32(acc, a1, b1);
-        acc = _mm512_dpbusd_epi32(acc, a1, b1);
-        acc = _mm512_dpbusd_epi32(acc, a1, b1);
+        acc = _mm512_dpbusd_epi32(acc, a2, b2);
+        acc = _mm512_dpbusd_epi32(acc, a3, b3);
 #else
         __m512i product0 = _mm512_maddubs_epi16(a0, b0);
         __m512i product1 = _mm512_maddubs_epi16(a1, b1);
