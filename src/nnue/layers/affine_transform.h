@@ -275,6 +275,20 @@ namespace Eval::NNUE::Layers {
         return _mm_add_epi32(_mm_add_epi32(sum128lo, sum128hi), bias);
       };
 
+      [[maybe_unused]] auto m256_haddx8 = [](__m256i sum0, __m256i sum1, __m256i sum2, __m256i sum3,
+                                             __m256i sum4, __m256i sum5, __m256i sum6, __m256i sum7, __m256i bias) -> __m256i {
+        sum0 = _mm256_hadd_epi32(sum0, sum1);
+        sum2 = _mm256_hadd_epi32(sum2, sum3);
+        sum4 = _mm256_hadd_epi32(sum4, sum5);
+        sum6 = _mm256_hadd_epi32(sum6, sum7);
+        sum0 = _mm256_hadd_epi32(sum0, sum2);
+        sum4 = _mm256_hadd_epi32(sum4, sum6);
+
+        sum1 = _mm256_blend_epi32(sum0, sum4, 240);
+        sum2 = _mm256_permute2x128_si256(sum0, sum4, 33);
+        return _mm256_add_epi32(_mm256_add_epi32(sum1, sum2), bias);
+      };
+
       [[maybe_unused]] auto m256_add_dpbusd_epi32 = [=](__m256i& acc, __m256i a, __m256i b) {
 #if defined (USE_VNNI)
         acc = _mm256_dpbusd_epi32(acc, a, b);
@@ -534,27 +548,39 @@ namespace Eval::NNUE::Layers {
 
       // kOutputDimensions is either 1 or a multiple of kSimdWidth
       // because then it is also an input dimension.
-      if constexpr (kOutputDimensions % 4 == 0)
+      if constexpr (kOutputDimensions % 8 == 0)
       {
-        for (IndexType i = 0; i < kOutputDimensions; i += 4)
+        for (IndexType i = 0; i < kOutputDimensions; i += 8)
         {
           const IndexType offset0 = (i + 0) * kPaddedInputDimensions;
           const IndexType offset1 = (i + 1) * kPaddedInputDimensions;
           const IndexType offset2 = (i + 2) * kPaddedInputDimensions;
           const IndexType offset3 = (i + 3) * kPaddedInputDimensions;
+          const IndexType offset4 = (i + 4) * kPaddedInputDimensions;
+          const IndexType offset5 = (i + 5) * kPaddedInputDimensions;
+          const IndexType offset6 = (i + 6) * kPaddedInputDimensions;
+          const IndexType offset7 = (i + 7) * kPaddedInputDimensions;
 
-          const __m128i bias = *reinterpret_cast<const __m128i*>(&biases_[i]);
-          __m128i* outptr = reinterpret_cast<__m128i*>(&output[i]);
+          const __m256i bias = *reinterpret_cast<const __m256i*>(&biases_[i]);
+          __m256i* outptr = reinterpret_cast<__m256i*>(&output[i]);
 
           __m256i sum0 = _mm256_setzero_si256();
           __m256i sum1 = _mm256_setzero_si256();
           __m256i sum2 = _mm256_setzero_si256();
           __m256i sum3 = _mm256_setzero_si256();
+          __m256i sum4 = _mm256_setzero_si256();
+          __m256i sum5 = _mm256_setzero_si256();
+          __m256i sum6 = _mm256_setzero_si256();
+          __m256i sum7 = _mm256_setzero_si256();
 
           const auto row0 = reinterpret_cast<const __m256i*>(&weights_[offset0]);
           const auto row1 = reinterpret_cast<const __m256i*>(&weights_[offset1]);
           const auto row2 = reinterpret_cast<const __m256i*>(&weights_[offset2]);
           const auto row3 = reinterpret_cast<const __m256i*>(&weights_[offset3]);
+          const auto row4 = reinterpret_cast<const __m256i*>(&weights_[offset4]);
+          const auto row5 = reinterpret_cast<const __m256i*>(&weights_[offset5]);
+          const auto row6 = reinterpret_cast<const __m256i*>(&weights_[offset6]);
+          const auto row7 = reinterpret_cast<const __m256i*>(&weights_[offset7]);
 
           int j = 0;
           if (!canSaturate16x4[i / 4])
@@ -568,6 +594,10 @@ namespace Eval::NNUE::Layers {
                   m256_add_dpbusd_epi32x2(sum1, in0, row1[j], in1, row1[j + 1]);
                   m256_add_dpbusd_epi32x2(sum2, in0, row2[j], in1, row2[j + 1]);
                   m256_add_dpbusd_epi32x2(sum3, in0, row3[j], in1, row3[j + 1]);
+                  m256_add_dpbusd_epi32x2(sum4, in0, row4[j], in1, row4[j + 1]);
+                  m256_add_dpbusd_epi32x2(sum5, in0, row5[j], in1, row5[j + 1]);
+                  m256_add_dpbusd_epi32x2(sum6, in0, row6[j], in1, row6[j + 1]);
+                  m256_add_dpbusd_epi32x2(sum7, in0, row7[j], in1, row7[j + 1]);
               }
           }
           for (; j < (int)kNumChunks; ++j)
@@ -578,9 +608,13 @@ namespace Eval::NNUE::Layers {
                 m256_add_dpbusd_epi32(sum1, in, row1[j]);
                 m256_add_dpbusd_epi32(sum2, in, row2[j]);
                 m256_add_dpbusd_epi32(sum3, in, row3[j]);
+                m256_add_dpbusd_epi32(sum4, in, row4[j]);
+                m256_add_dpbusd_epi32(sum5, in, row5[j]);
+                m256_add_dpbusd_epi32(sum6, in, row6[j]);
+                m256_add_dpbusd_epi32(sum7, in, row7[j]);
           }
 
-          *outptr = m256_haddx4(sum0, sum1, sum2, sum3, bias);
+          *outptr = m256_haddx8(sum0, sum1, sum2, sum3, sum4, sum5, sum6, sum7, bias);
         }
       }
       else if constexpr (kOutputDimensions == 1)
