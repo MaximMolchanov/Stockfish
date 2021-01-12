@@ -96,7 +96,7 @@ namespace Eval::NNUE::Layers {
                           if (k > 3)
                           {
                               k -= 4;
-                              idx += kPaddedInputDimensions / 2;
+                              idx += kPaddedInputDimensions / 2 * kOutputDimensions;
                           }
                           return idx + k / 2 * kOutputDimensions * 4 + k % 2;
                       };
@@ -118,7 +118,7 @@ namespace Eval::NNUE::Layers {
 
                               IndexType idx = kToIdx(maxK);
                               sum[sign == -1] -= w[idx];
-                              canSaturate16.add(j, i + maxK / 2 * 4 + maxK % 2 + x * 2, w[idx]);
+                              canSaturate16.add(j, i + (maxK < 4 ? maxK / 2 * 4 : (maxK - 4) / 2 * 4 + kPaddedInputDimensions / 2) + maxK % 2 + x * 2, w[idx]);
                               w[idx] = 0;
                           }
                   }
