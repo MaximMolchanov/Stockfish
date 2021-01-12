@@ -85,15 +85,24 @@ namespace Eval::NNUE::Layers {
       {
           canSaturate16.count = 0;
 #if !defined(USE_VNNI)
-          for (IndexType i = 0; i < kPaddedInputDimensions; i += 16)
+          for (IndexType i = 0; i * 2 < kPaddedInputDimensions; i += 8)
               for (IndexType j = 0; j < kOutputDimensions; ++j)
                   for (int x = 0; x < 2; ++x)
                   {
                       WeightType* w = &weights_[i * kOutputDimensions + j * 4 + x * 2];
                       int sum[2] = {0, 0};
+                      auto kToIdx = [=](IndexType k) -> int {
+                          int idx = 0;
+                          if (k > 3)
+                          {
+                              k -= 4;
+                              idx += kPaddedInputDimensions / 2;
+                          }
+                          return idx + k / 2 * kOutputDimensions * 4 + k % 2;
+                      };
                       for (int k = 0; k < 8; ++k)
                       {
-                          IndexType idx = k / 2 * kOutputDimensions * 4 + k % 2;
+                          IndexType idx = kToIdx(k);
                           sum[w[idx] < 0] += w[idx];
                       }
                       for (int sign : {-1, 1})
@@ -102,12 +111,12 @@ namespace Eval::NNUE::Layers {
                               int maxK = 0, maxW = 0;
                               for (int k = 0; k < 8; ++k)
                               {
-                                  IndexType idx = k / 2 * kOutputDimensions * 4 + k % 2;
+                                  IndexType idx = kToIdx(k);
                                   if (maxW < sign * w[idx])
                                       maxK = k, maxW = sign * w[idx];
                               }
 
-                              IndexType idx = maxK / 2 * kOutputDimensions * 4 + maxK % 2;
+                              IndexType idx = kToIdx(maxK);
                               sum[sign == -1] -= w[idx];
                               canSaturate16.add(j, i + maxK / 2 * 4 + maxK % 2 + x * 2, w[idx]);
                               w[idx] = 0;
@@ -144,19 +153,6 @@ namespace Eval::NNUE::Layers {
         acc = _mm512_dpbusd_epi32(acc, a, b);
 #else
         __m512i product0 = _mm512_maddubs_epi16(a, b);
-        product0 = _mm512_madd_epi16(product0, kOnes512);
-        acc = _mm512_add_epi32(acc, product0);
-#endif
-      };
-
-      [[maybe_unused]] auto m512_add_dpbusd_epi32x2 = [=](__m512i& acc, __m512i a0, __m512i b0, __m512i a1, __m512i b1) {
-#if defined (USE_VNNI)
-        acc = _mm512_dpbusd_epi32(acc, a0, b0);
-        acc = _mm512_dpbusd_epi32(acc, a1, b1);
-#else
-        __m512i product0 = _mm512_maddubs_epi16(a0, b0);
-        __m512i product1 = _mm512_maddubs_epi16(a1, b1);
-        product0 = _mm512_add_epi16(product0, product1);
         product0 = _mm512_madd_epi16(product0, kOnes512);
         acc = _mm512_add_epi32(acc, product0);
 #endif
@@ -204,19 +200,6 @@ namespace Eval::NNUE::Layers {
 #endif
       };
 
-      [[maybe_unused]] auto m256_add_dpbusd_epi32x2 = [=](__m256i& acc, __m256i a0, __m256i b0, __m256i a1, __m256i b1) {
-#if defined (USE_VNNI)
-        acc = _mm256_dpbusd_epi32(acc, a0, b0);
-        acc = _mm256_dpbusd_epi32(acc, a1, b1);
-#else
-        __m256i product0 = _mm256_maddubs_epi16(a0, b0);
-        __m256i product1 = _mm256_maddubs_epi16(a1, b1);
-        product0 = _mm256_add_epi16(product0, product1);
-        product0 = _mm256_madd_epi16(product0, kOnes256);
-        acc = _mm256_add_epi32(acc, product0);
-#endif
-      };
-
       [[maybe_unused]] auto m256_add_dpbusd_epi32x4 = [=](__m256i& acc, __m256i a0, __m256i b0, __m256i a1, __m256i b1,
                                                                         __m256i a2, __m256i b2, __m256i a3, __m256i b3) {
 #if defined (USE_VNNI)
@@ -254,14 +237,6 @@ namespace Eval::NNUE::Layers {
         acc = _mm_add_epi32(acc, product0);
       };
 
-      [[maybe_unused]] auto m128_add_dpbusd_epi32x2 = [=](__m128i& acc, __m128i a0, __m128i b0, __m128i a1, __m128i b1) {
-        __m128i product0 = _mm_maddubs_epi16(a0, b0);
-        __m128i product1 = _mm_maddubs_epi16(a1, b1);
-        product0 = _mm_adds_epi16(product0, product1);
-        product0 = _mm_madd_epi16(product0, kOnes128);
-        acc = _mm_add_epi32(acc, product0);
-      };
-
       [[maybe_unused]] auto m128_add_dpbusd_epi32x4 = [=](__m128i& acc, __m128i a0, __m128i b0, __m128i a1, __m128i b1,
                                                                         __m128i a2, __m128i b2, __m128i a3, __m128i b3) {
         __m128i product0 = _mm_maddubs_epi16(a0, b0);
@@ -282,7 +257,6 @@ namespace Eval::NNUE::Layers {
       #define vec_setzero _mm512_setzero_si512
       #define vec_set_32 _mm512_set1_epi32
       auto& vec_add_dpbusd_32 = m512_add_dpbusd_epi32;
-      auto& vec_add_dpbusd_32x2 = m512_add_dpbusd_epi32x2;
       auto& vec_add_dpbusd_32x4 = m512_add_dpbusd_epi32x4;
       auto& vec_hadd = m512_hadd;
 #elif defined (USE_AVX2)
@@ -290,7 +264,6 @@ namespace Eval::NNUE::Layers {
       #define vec_setzero _mm256_setzero_si256
       #define vec_set_32 _mm256_set1_epi32
       auto& vec_add_dpbusd_32 = m256_add_dpbusd_epi32;
-      auto& vec_add_dpbusd_32x2 = m256_add_dpbusd_epi32x2;
       auto& vec_add_dpbusd_32x4 = m256_add_dpbusd_epi32x4;
       auto& vec_hadd = m256_hadd;
 #elif defined (USE_SSSE3)
@@ -298,8 +271,7 @@ namespace Eval::NNUE::Layers {
       #define vec_setzero _mm_setzero_si128
       #define vec_set_32 _mm_set1_epi32
       auto& vec_add_dpbusd_32 = m128_add_dpbusd_epi32;
-      auto& vec_add_dpbusd_32x2 = m128_add_dpbusd_epi32x2;
-      auto& vec_add_dpbusd_32x4 = m256_add_dpbusd_epi32x4;
+      auto& vec_add_dpbusd_32x4 = m128_add_dpbusd_epi32x4;
       auto& vec_hadd = m128_hadd;
 #endif
 
@@ -326,8 +298,7 @@ namespace Eval::NNUE::Layers {
               while (nonZeroChunks > 0 && input32[nonZeroChunks - 1] == 0 && input32[nonZeroChunks + kNumChunks - 1] == 0)
                   --nonZeroChunks;
           }
-          int i = 0;
-          for (i = 0; i < nonZeroChunks - 1; i += 2)
+          for (int i = 0; i < nonZeroChunks; i += 2)
           {
               const vec_t in0 = vec_set_32(input32[i + 0]);
               const vec_t in1 = vec_set_32(input32[i + 1]);
@@ -340,16 +311,7 @@ namespace Eval::NNUE::Layers {
               for (int j = 0; j * kOutputSimdWidth < kOutputDimensions; ++j)
                   vec_add_dpbusd_32x4(outptr[j], in0, col0[j], in1, col1[j], in2, col2[j], in3, col3[j]);
           }
-          for (; i < nonZeroChunks; ++i)
-          {
-              const vec_t in0 = vec_set_32(input32[i]);
-              const vec_t in1 = vec_set_32(input32[i + kNumChunks]);
-              const auto col0 = reinterpret_cast<const vec_t*>(&weights_[i * kOutputDimensions * 4]);
-              const auto col1 = reinterpret_cast<const vec_t*>(&weights_[(i + kNumChunks) * kOutputDimensions * 4]);
-              for (int j = 0; j * kOutputSimdWidth < kOutputDimensions; ++j)
-                  vec_add_dpbusd_32x2(outptr[j], in0, col0[j], in1, col1[j]);
-          }
-          for (i = 0; i < canSaturate16.count; ++i)
+          for (int i = 0; i < canSaturate16.count; ++i)
               output[canSaturate16.ids[i].out] += input[canSaturate16.ids[i].in] * canSaturate16.ids[i].w;
       }
       else if constexpr (kOutputDimensions == 1)
