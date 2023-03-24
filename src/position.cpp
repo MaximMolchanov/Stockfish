@@ -1202,10 +1202,9 @@ bool Position::has_repeated() const {
 
 bool Position::has_game_cycle(int ply) const {
 
-  if (st->repetition < 0 || (st->repetition > 0 && st->repetition <= ply + 2))
-      return true;
+  int j;
 
-  int end = st->repetition ? ply - 1 : std::min(st->rule50, st->pliesFromNull), j;
+  int end = std::min(st->rule50, st->pliesFromNull);
 
   if (end < 3)
     return false;
