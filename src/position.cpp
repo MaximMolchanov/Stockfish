@@ -1210,9 +1210,6 @@ bool Position::has_game_cycle(int ply) const {
 
   int end = std::min(st->rule50, st->pliesFromNull);
 
-  if (end < 3)
-    return false;
-
   Key originalKey = st->key;
   StateInfo* stp = st->previous;
 
