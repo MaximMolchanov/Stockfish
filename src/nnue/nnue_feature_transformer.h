@@ -568,14 +568,16 @@ namespace Stockfish::Eval::NNUE {
           vec_store(&accTile[k], acc[k]);
       }
 
+      const IndexType offsetFirst = PSQTBuckets * *active.begin();
       for (IndexType j = 0; j < PSQTBuckets / PsqtTileHeight; ++j)
       {
+        auto columnPsqtFirst = reinterpret_cast<const psqt_vec_t*>(&psqtWeights[offsetFirst + j * PsqtTileHeight]);
         for (std::size_t k = 0; k < NumPsqtRegs; ++k)
-          psqt[k] = vec_zero_psqt();
+          psqt[k] = columnPsqtFirst[k];
 
-        for (const auto index : active)
+        for (auto index = active.begin() + 1; index != active.end(); ++index)
         {
-          const IndexType offset = PSQTBuckets * index + j * PsqtTileHeight;
+          const IndexType offset = PSQTBuckets * *index + j * PsqtTileHeight;
           auto columnPsqt = reinterpret_cast<const psqt_vec_t*>(&psqtWeights[offset]);
 
           for (std::size_t k = 0; k < NumPsqtRegs; ++k)
